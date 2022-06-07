@@ -56,6 +56,7 @@ from nltk import word_tokenize
 from nltk.stem import WordNetLemmatizer
 from nltk.stem import PorterStemmer
 from sklearn.feature_extraction.text import CountVectorizer
+import unidecode
 
 ## Create a custom tokenizer class to pass to the CountVectorizer.
 # This will permit the stemming and lemmatization of the corpus.
@@ -234,7 +235,7 @@ def processTextList(stringList: list,
             tokenizer = LemmaStemTokenizer(),
             # Consider up to trigrams (if default settings for processTextList() are used)
             # This is so things like "black lives matter" and names (e.g., FirstName_LastName) are grouped
-            ngram_range = (1,3),
+            ngram_range = (minNGram,maxNGram),
             # ngrams should be of words, not characters
             analyzer = "word",
             # Only include the top "maxVocabulary"--default 100--features in the vocabulary
@@ -532,3 +533,62 @@ for yDict in fullDataset:
 """
 
 #testCorpus = ["This is a document", "This is another document", "foo bar baz", "is this a document?"]
+
+## Only preprocesses a list of documents, returning a tokenized and preprocessed list of documents.
+#   The following is handled in this method:
+#       1) punctuation removal
+#       2) capitalization removal
+#       3) accent/diacritic removal
+#       4) custom stop word list removal
+#       5) lemmatization
+#       6) stemming
+#       7) tokenization
+#
+# @arg docList a List of Strings representing the raw documents to process
+# @arg stopWordsListFilename the filename, including the .pkl extension, of the desired stopwords list to use
+#
+# @return a List of Lists of Strings representing the processed documents.
+def justProcessCorpus(docList, stopWordsListFilename = "stopWordsLessSix.pkl"):
+    
+    # Remove punctuation
+    noPunc = list(map(lambda x: re.sub("[^ \w\s]", "", x), docList))       
+    
+    # Load the Stemmer, Lemmatizer, and Tokenizer
+    tokenizer = LemmaStemTokenizer()
+    
+    # Load the custom stop word list created for this project
+    try:
+        with open(stopWordsListFilename, "rb") as file:
+            stopWordsList = pickle.load(file)
+    except:
+        print("Error loading the stop words file.  Execution terminated.")
+        return
+    
+    # Initialize an empty list to populate with the processed documents
+    tbr = []
+    
+    for doc in noPunc:
+        # Strip accents
+        newDoc = unidecode.unidecode(doc)
+        
+        # Strip Capitalization
+        newDoc = newDoc.lower()
+        
+        # Stem, Lemmatize, and Tokenize
+        newDoc = tokenizer(newDoc)
+        # newDoc is now a List of tokens instead of a single String
+        
+        # Remove stop words
+        newDoc = [word for word in newDoc if word not in stopWordsList]
+        
+        tbr.append(newDoc)
+    
+    return tbr
+
+"""
+# This was used via console to process the 2022 data
+proc2022 = justProcessCorpus(list2022)
+df = pd.DataFrame(proc2022)
+df.to_csv("proc2022.csv", index = False, index_label = False)
+# index = False -> no row names, index_label = False -> no column names
+"""
